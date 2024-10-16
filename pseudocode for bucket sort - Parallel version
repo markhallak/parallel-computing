@@ -1,0 +1,62 @@
+BEGIN ParallelBucketSort
+    Initialize MPI environment
+    Get rank and size of processes (rank, size)
+    
+    IF rank == 0 THEN
+        Generate array 'data' of size N with random integers
+        Copy 'data' to 'sorted_serial' for serial sorting
+        Start timer for serial sort
+        Sort 'sorted_serial' using serial quicksort
+        Stop timer for serial sort
+        Record 'serial_time'
+    END IF
+    
+    Broadcast N to all processes
+    
+    Compute 'chunk_size' = N / size
+    
+    Allocate 'local_data' array of size 'chunk_size'
+    
+    Scatter 'data' to all processes, each gets 'local_data'
+    
+    Sort 'local_data' using quicksort
+    
+    Initialize buckets: 2D array 'buckets[size][chunk_size]'
+    Initialize 'sendcounts[size]' and 'sdispls[size]' to 0
+    
+    FOR each element in 'local_data' DO
+        Determine 'target_proc' based on element value and total range
+        Place element into 'buckets[target_proc]'
+        Increment 'sendcounts[target_proc]'
+    END FOR
+    
+    Compute 'sdispls' based on 'sendcounts'
+    Pack 'sendbuf' from 'buckets' based on 'sdispls' and 'sendcounts'
+    
+    All processes exchange 'sendcounts' to get 'recvcounts' using 'MPI_Alltoall'
+    Compute 'rdispls' based on 'recvcounts'
+    
+    Allocate 'recvbuf' of size 'total_recv' based on 'recvcounts'
+    
+    All-to-all exchange data using 'MPI_Alltoallv' from 'sendbuf' to 'recvbuf'
+    
+    Sort 'recvbuf' using quicksort
+    
+    Gather 'total_recv' from all processes at root using 'MPI_Gather'
+    
+    IF rank == 0 THEN
+        Compute 'rdispls' for gathering sorted data
+        Allocate 'sorted_parallel' array of size N
+    END IF
+    
+    Gather sorted data from all processes to 'sorted_parallel' at root using 'MPI_Gatherv'
+    
+    IF rank == 0 THEN
+        Compare 'sorted_serial' and 'sorted_parallel' for correctness
+        Compute 'parallel_time'
+        Compute 'speedup' = serial_time / parallel_time
+        Output 'speedup' and verification result
+    END IF
+    
+    Finalize MPI environment
+END ParallelBucketSort
